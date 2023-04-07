@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "GlossaryCompliance": {
+      "commandName": "Project",
+      "commandLineArgs": "\"C:\\Users\\wendt\\OneDrive - American Red Cross\\TrainingData\""
+    }
+  }
+}
