@@ -46,13 +46,13 @@ void ReadGlossaryFromExcel(string excelFileName, ref Dictionary<string, string> 
                     rememberA = value;
                     continue;
                 }
-                if (cell.CellReference.InnerText.StartsWith('B') && value is not null)
+                if (cell.CellReference.InnerText.StartsWith('B') && value is not null && rememberA is not null)
                 {
-                    if (!glossary.TryAdd(rememberA, value))
+                    if (!glossary.TryAdd(rememberA.Trim(), value.Trim()))
                     {
                         Console.WriteLine($"Duplicate glossary entry: {rememberA} - {value}");
                     }
-                    continue;
+                    break;
                 }
                 Console.WriteLine($"Something went wrong with glossary entry {cell.CellValue.Text}: Either source or target are empty.");
             }
@@ -133,9 +133,9 @@ void ProcessFile(string filePath)
             }
         }
     }
-    Console.WriteLine("==========================");
-    Console.WriteLine(Path.GetFileName(filePath));
-    Console.WriteLine("--------------------------");
+    Console.WriteLine("=================================================");
+    Console.WriteLine($"{Path.GetFileName(filePath)}\t{Path.GetFileName(targetFileName)}");
+    Console.WriteLine("-------------------------------------------------");
     int matchCount = 0;
     foreach (string glosEntry in glosCountPerSourceDoc.Keys)
     {
