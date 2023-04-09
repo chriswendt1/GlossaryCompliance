@@ -2,7 +2,7 @@
   "profiles": {
     "GlossaryCompliance": {
       "commandName": "Project",
-      "commandLineArgs": "\"C:\\Users\\wendt\\OneDrive - American Red Cross\\TrainingData\""
+      "commandLineArgs": "\"C:\\Users\\wendt\\OneDrive - American Red Cross\\TrainingData\" \"American Red Cross Glossary of Terms in English-Spanish_03_14_2023.xlsx\""
     }
   }
 }
