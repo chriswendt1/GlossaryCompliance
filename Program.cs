@@ -95,10 +95,12 @@ void ProcessFile(string filePath)
     {
         foreach (string glosEntry in glossary.Keys)
         {
+            //Debug.Assert(!(text.InnerText.Contains("shelters") && (glosEntry=="shelters")));
+            //BUGBUG This counting misses a count when the glossary term appears multiple times in the same text segment
             if (Regex.Match(text.InnerText, "\\b" + glosEntry + "\\b").Success)
             {
                 if (glosCountPerSourceDoc.TryGetValue(glosEntry, out int value))
-                    value++;
+                    glosCountPerSourceDoc[glosEntry] += 1;
                 else
                     glosCountPerSourceDoc.Add(glosEntry, 1);
             }
@@ -123,13 +125,16 @@ void ProcessFile(string filePath)
     {
         foreach (string glosEntry in glosCountPerSourceDoc.Keys)
         {
-            
-            if (Regex.Match(text.InnerText , "\\b" + glossary[glosEntry] + "\\b", RegexOptions.IgnoreCase).Success)
+            string[] alternatives = glossary[glosEntry].Split('/');
+            foreach (string alternative in alternatives)
             {
-                if (glosCountPerTargetDoc.TryGetValue(glosEntry, out int value))
-                    value++;
-                else
-                    glosCountPerTargetDoc.Add(glosEntry, 1);
+                if (Regex.Match(text.InnerText, "\\b" + alternative.Trim() + "\\b", RegexOptions.IgnoreCase).Success)
+                {
+                    if (glosCountPerTargetDoc.TryGetValue(glosEntry, out int value))
+                        glosCountPerTargetDoc[glosEntry] += 1;
+                    else
+                        glosCountPerTargetDoc.Add(glosEntry, 1);
+                }
             }
         }
     }
