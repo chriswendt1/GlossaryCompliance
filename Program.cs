@@ -4,17 +4,23 @@ using System.Text.RegularExpressions;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
 using DocumentFormat.OpenXml.Wordprocessing;
+using GlossaryCompliance;
 using Text = DocumentFormat.OpenXml.Wordprocessing.Text;
 
 Console.WriteLine("Check Word docs for glossary compliance");
 Dictionary<string, string> glossary = new();
+int totalHits = 0;
+int totalMisses = 0;
+ReportWriter reportWriter = new("report.txt");
 
 if (args.Length > 1)
 {
     ReadGlossaryFromExcel(args[0] + Path.DirectorySeparatorChar + args[1], ref glossary);
-    Console.WriteLine("Glossary read.");
+    reportWriter.WriteLine("Glossary read.");
     string rootPath = args[0];
     TraverseDirectory(rootPath, ProcessFile);
+    reportWriter.WriteLine($"Total hits: {totalHits}\tTotal misses: {totalMisses}");
+    reportWriter.Show();
     return 0;
 }
 else
@@ -50,15 +56,15 @@ void ReadGlossaryFromExcel(string excelFileName, ref Dictionary<string, string> 
                 {
                     if (!glossary.TryAdd(rememberA.Trim(), value.Trim()))
                     {
-                        Console.WriteLine($"Duplicate glossary entry: {rememberA} - {value}");
+                        reportWriter.WriteLine($"Duplicate glossary entry: {rememberA} - {value}");
                     }
                     break;
                 }
-                Console.WriteLine($"Something went wrong with glossary entry {cell.CellValue.Text}: Either source or target are empty.");
+                reportWriter.WriteLine($"Something went wrong with glossary entry {cell.CellValue.Text}: Either source or target are empty.");
             }
         }
     }
-    Console.WriteLine($"{glossary.Count} glossary entries read.");
+    reportWriter.WriteLine($"{glossary.Count} glossary entries read.");
     document.Close();
 }
 
@@ -90,7 +96,7 @@ void ProcessFile(string filePath)
             .Where(text => !String.IsNullOrEmpty(text.Text) && text.Text.Length > 0));
 
     //count up all glossary entries in the source document
-    Dictionary<string, int> glosCountPerSourceDoc = new();
+    Dictionary<string, CountPair> glosCountPerDoc = new();
     foreach (Text text in textsSource)
     {
         foreach (string glosEntry in glossary.Keys)
@@ -99,10 +105,13 @@ void ProcessFile(string filePath)
             //BUGBUG This counting misses a count when the glossary term appears multiple times in the same text segment
             if (Regex.Match(text.InnerText, "\\b" + glosEntry + "\\b").Success)
             {
-                if (glosCountPerSourceDoc.TryGetValue(glosEntry, out int value))
-                    glosCountPerSourceDoc[glosEntry] += 1;
+                if (glosCountPerDoc.TryGetValue(glosEntry, out CountPair countPair))
+                {
+                    countPair.SourceCount++;
+                    glosCountPerDoc[glosEntry] = countPair;
+                }
                 else
-                    glosCountPerSourceDoc.Add(glosEntry, 1);
+                    glosCountPerDoc.Add(glosEntry, new CountPair(1, 0));
             }
         }
     }
@@ -111,7 +120,7 @@ void ProcessFile(string filePath)
     string targetFileName = filePath.Replace("_EN.", "_ES.");
     if (!File.Exists(targetFileName))
     {
-        Console.WriteLine($"ERROR: Target file {targetFileName} not found.");
+        reportWriter.WriteLine($"ERROR: Target file {targetFileName} not found.");
         return;
     }
     List<Text> textsTarget = new();
@@ -120,42 +129,44 @@ void ProcessFile(string filePath)
     textsTarget.AddRange(bodyTarget.Descendants<DocumentFormat.OpenXml.Wordprocessing.Text>()
             .Where(text => !String.IsNullOrEmpty(text.Text) && text.Text.Length > 0));
 
-    Dictionary<string, int> glosCountPerTargetDoc = new();
     foreach (Text text in textsTarget)
     {
-        foreach (string glosEntry in glosCountPerSourceDoc.Keys)
+        foreach (string glosEntry in glosCountPerDoc.Keys)
         {
             string[] alternatives = glossary[glosEntry].Split('/');
             foreach (string alternative in alternatives)
             {
-                if (Regex.Match(text.InnerText, "\\b" + alternative.Trim() + "\\b", RegexOptions.IgnoreCase).Success)
+                MatchCollection matches = Regex.Matches(text.InnerText, "\\b" + alternative.Trim() + "\\b", RegexOptions.IgnoreCase);
+                if (matches.Count > 0)
                 {
-                    if (glosCountPerTargetDoc.TryGetValue(glosEntry, out int value))
-                        glosCountPerTargetDoc[glosEntry] += 1;
-                    else
-                        glosCountPerTargetDoc.Add(glosEntry, 1);
+                    //Debug.Assert(text.InnerText.Contains("asistencia financiera"));
+                    CountPair countPair = glosCountPerDoc[glosEntry];
+                    countPair.TargetCount += matches.Count;
+                    glosCountPerDoc[glosEntry] = countPair;
                 }
             }
         }
     }
-    Console.WriteLine("=================================================");
-    Console.WriteLine($"{Path.GetFileName(filePath)}\t{Path.GetFileName(targetFileName)}");
-    Console.WriteLine("-------------------------------------------------");
+    reportWriter.WriteLine("=================================================");
+    reportWriter.WriteLine($"{Path.GetFileName(filePath)}\t{Path.GetFileName(targetFileName)}");
+    reportWriter.WriteLine("-------------------------------------------------");
     int matchCount = 0;
-    foreach (string glosEntry in glosCountPerSourceDoc.Keys)
+    int missCount = 0;
+    foreach (string glosEntry in glosCountPerDoc.Keys)
     {
-        if (glosCountPerTargetDoc.TryGetValue(glosEntry, out int value) && (value == glosCountPerTargetDoc[glosEntry]))
+        if (glosCountPerDoc[glosEntry].IsSatisfied())
         {
             matchCount++;
         }
         else
         {
-            int glosTargetCount = 0;
-            if (glosCountPerTargetDoc.ContainsKey(glosEntry)) glosTargetCount = glosCountPerTargetDoc[(glosEntry)];
-            Console.WriteLine($"Glossary mismatch:\t{glosEntry}\t{glosCountPerSourceDoc[glosEntry]}\t{glosTargetCount}");
+            reportWriter.WriteLine($"Glossary mismatch:\t{glosEntry}\t{glosCountPerDoc[glosEntry].SourceCount}\t{glossary[glosEntry]}\t{glosCountPerDoc[glosEntry].TargetCount}");
+            missCount++;
         }
     }
-    Console.WriteLine($"{matchCount} entries verified.\t{glosCountPerSourceDoc.Count - matchCount} entries failed.");
+    reportWriter.WriteLine($"{matchCount} entries verified.\t{missCount} entries failed.");
+    totalHits += matchCount;
+    totalMisses += missCount;
 }
 
 
