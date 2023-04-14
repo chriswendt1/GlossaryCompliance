@@ -8,7 +8,6 @@ namespace GlossaryCompliance
         public ReportWriter(string filename)
         {
             FileName = filename;
-            File.WriteAllText(FileName, $"{DateTime.Now.ToShortDateString()} {DateTime.Now.ToShortTimeString()}\r\n");
         }
 
         public void WriteLine(string text)
