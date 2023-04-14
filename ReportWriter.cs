@@ -7,7 +7,7 @@ namespace GlossaryCompliance
         public string FileName { get; }
         public ReportWriter(string filename)
         {
-            FileName = filename;
+            FileName = Path.GetTempPath() + filename;
             File.WriteAllText(FileName, $"{DateTime.Now.ToShortDateString()} {DateTime.Now.ToShortTimeString()}\r\n");
         }
 
