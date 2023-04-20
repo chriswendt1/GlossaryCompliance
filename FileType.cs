@@ -1,0 +1,3 @@
+﻿enum FileType { docx, tmx };
+
+
