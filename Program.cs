@@ -18,7 +18,7 @@ ReportWriter reportWriter = new("report.txt");
 
 if (args.Length > 1)
 {
-    ReadGlossaryFromExcel(args[0] + Path.DirectorySeparatorChar + args[1], ref glossary);
+    ReadGlossaryFromExcel(args[1], ref glossary);
     reportWriter.WriteLine("Glossary read.");
     string rootPath = args[0];
     TraverseDirectory(rootPath, ProcessFile);
@@ -33,6 +33,11 @@ return 1;
 void ReadGlossaryFromExcel(string excelFileName, ref Dictionary<string, string> glossary)
 {
     using SpreadsheetDocument document = SpreadsheetDocument.Open(excelFileName, false);
+    if (document is null)
+    {
+        reportWriter.WriteLine($"ERROR: Could not open {excelFileName}.");
+        throw new FileNotFoundException($"ERROR: Could not open {excelFileName}.");
+    }
     var sheets = document.WorkbookPart.WorksheetParts;
 
     // Loop through each of the sheets in the spreadsheet
@@ -49,7 +54,8 @@ void ReadGlossaryFromExcel(string excelFileName, ref Dictionary<string, string> 
             string rememberA = null;
             foreach (var cell in cells)
             {
-                string value = document.WorkbookPart.SharedStringTablePart.SharedStringTable.ElementAt(int.Parse(cell.CellValue.Text)).InnerText;
+                if (cell.CellValue is null) continue;
+                string? value = document.WorkbookPart.SharedStringTablePart.SharedStringTable.ElementAt(int.Parse(cell.CellValue.Text)).InnerText;
                 if (cell.CellReference.InnerText.StartsWith('A') && value is not null)
                 {
                     rememberA = value;
@@ -276,6 +282,11 @@ void ProcessFile(string filePath, FileType fileType)
     if (!File.Exists(targetFileName))
     {
         reportWriter.WriteLine($"ERROR: Target file {targetFileName} not found.");
+        return;
+    }
+    if (filePath == targetFileName)
+    {
+        reportWriter.WriteLine($"ERROR: Target file {targetFileName} is the same as the source file.");
         return;
     }
     List<Text> textsTarget = new();
